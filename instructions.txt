@@ -1,0 +1,9 @@
+# Place this folder under /home/<username>
+# Note that you need to change <username> with your own username
+
+# To run the container
+# Change <> to whatever name you want
+docker run --runtime=nvidia --name <container_name> -d -it -p 8888:8888 -v /home/<username>/dockerfiles:/Dockerfile <container_name>:<version>
+
+# You need to attach the container to use it
+docker attach <container_name>
