@@ -5,10 +5,13 @@ FROM nvidia/cuda:9.0-cudnn7-devel-ubuntu16.04
 RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
     PIP_INSTALL="python -m pip --no-cache-dir install --upgrade" && \
     GIT_CLONE="git clone --depth 10" && \
+
     rm -rf /var/lib/apt/lists/* \
            /etc/apt/sources.list.d/cuda.list \
            /etc/apt/sources.list.d/nvidia-ml.list && \
+
     apt-get update && \
+
 
 # ===== Tools =====
     DEBIAN_FRONTEND=noninteractive $APT_INSTALL \
@@ -123,5 +126,19 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
     apt-get clean && \
     apt-get autoremove && \
     rm -rf /var/lib/apt/lists/* /tmp/* ~/*
+
+# ===== Some tweak to avoid import error when using this container in pycharm =====
+# RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1
+# RUN LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs/:$LD_LIBRARY_PATH python3 setup.py install 
+# RUN rm /usr/local/cuda/lib64/stubs/libcuda.so.1
+
+ENV     CUDNN_INSTALL_PATH=/usr/lib/x86_64-linux-gnu/
+ENV     CUDA_TOOLKIT_PATH=/usr/local/cuda/
+
+ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64:$LD_LIBRARY_PATH
+RUN mkdir -p /usr/local/nvidia/lib64/ \
+              && cd /usr/local/nvidia/lib64/ \
+              && ln -s /usr/local/cuda/targets/x86_64-linux/lib/stubs/libcuda.so libcuda.so.1 \
+              && ldconfig /usr/local/cuda/lib64
 
 EXPOSE 8888 6006
