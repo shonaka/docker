@@ -1,131 +1,127 @@
 # Sho's custom docker file for research
 
-FROM nvidia/cuda:9.0-cudnn7-devel-ubuntu16.04
+FROM nvidia/cuda:9.0-devel-ubuntu16.04
 
-RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
-    PIP_INSTALL="python -m pip --no-cache-dir install --upgrade" && \
-    GIT_CLONE="git clone --depth 10" && \
+MAINTAINER Sho Nakagome <snakagome@uh.edu>
 
-    rm -rf /var/lib/apt/lists/* \
-           /etc/apt/sources.list.d/cuda.list \
-           /etc/apt/sources.list.d/nvidia-ml.list && \
+# Partially from https://github.com/uber/horovod/blob/master/Dockerfile
+# TensorFlow version is tightly coupled to CUDA and cuDNN so it should be selected carefully
+ENV TENSORFLOW_VERSION=1.10.0
+ENV PYTORCH_VERSION=0.4.0
+ENV CUDNN_VERSION=7.0.5.15-1+cuda9.0
+ENV NCCL_VERSION=2.2.13-1+cuda9.0
 
-    apt-get update && \
+# Setting Python version
+ARG python=3.5
+ENV PYTHON_VERSION=${python}
 
+RUN echo "deb http://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list
 
-# ===== Tools =====
-    DEBIAN_FRONTEND=noninteractive $APT_INSTALL \
+RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
-        ca-certificates \
         cmake \
-        wget \
         git \
+        curl \
         vim \
-        && \
+        wget \
+        ca-certificates \
+        libcudnn7=${CUDNN_VERSION} \
+        libnccl2=${NCCL_VERSION} \
+        libnccl-dev=${NCCL_VERSION} \
+        libjpeg-dev \
+        libpng-dev \
+        python${PYTHON_VERSION} \
+        python${PYTHON_VERSION}-dev
 
-# ===== Python itself =====
-    DEBIAN_FRONTEND=noninteractive $APT_INSTALL \
-        software-properties-common \
-        && \
-    add-apt-repository ppa:deadsnakes/ppa && \
-    apt-get update && \
-    DEBIAN_FRONTEND=noninteractive $APT_INSTALL \
-        python3.6 \
-        python3.6-dev \
-        && \
-    wget -O ~/get-pip.py \
-        https://bootstrap.pypa.io/get-pip.py && \
-    python3.6 ~/get-pip.py && \
-    ln -s /usr/bin/python3.6 /usr/local/bin/python3 && \
-    ln -s /usr/bin/python3.6 /usr/local/bin/python && \
-    $PIP_INSTALL \
-        setuptools \
-        && \
+RUN ln -s /usr/bin/python${PYTHON_VERSION} /usr/bin/python
+
+RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
+    python get-pip.py && \
+    rm get-pip.py
 
 # ===== Other external libraries for Python =====
-    $PIP_INSTALL \
-        numpy \
-        scipy \
-        pandas \
-        scikit-learn \
-        matplotlib \
-        Cython \
-	hyperopt \
-	seaborn \
-	jupyter \
-        && \
+# Install some python libraries
+RUN pip install numpy scipy pandas scikit-learn matplotlib Cython hyperopt seaborn jupyter ruamel.yaml
 
-# xgboost
-    cd /usr/local/src && mkdir xgboost && cd xgboost && \
-    git clone --depth 1 --recursive https://github.com/dmlc/xgboost.git && cd xgboost && \
-    make && cd python-package && python setup.py install && \
-    pip install lightgbm && \
+# Install xgboost
+RUN git clone --recursive https://github.com/dmlc/xgboost && \
+    cd xgboost && \
+    make -j4 && \
+    cd python-package; python setup.py install
 
-# open-mpi
-    cd /usr/local/src && mkdir openmpi && cd openmpi && \
-    wget https://www.open-mpi.org/software/ompi/v2.0/downloads/openmpi-2.0.1.tar.gz && \
-    tar -xzf openmpi-2.0.1.tar.gz && cd openmpi-2.0.1 && \
-    ./configure --prefix=/usr/local/openmpi && make && make install && \
-    export PATH="/usr/local/openmpi/bin:$PATH" && \
-
-# lightgbm
-    cd /usr/local/src && mkdir lightgbm && cd lightgbm && \
-    git clone --recursive https://github.com/Microsoft/LightGBM && \
-    cd LightGBM && mkdir build && cd build && cmake -DUSE_MPI=ON .. && make && \
+# Install lightgbm
+RUN git clone --recursive --branch stable https://github.com/Microsoft/LightGBM && \
+    mkdir LightGBM/build && \
+    cd LightGBM/build && \
+    cmake .. && \
+    make -j4 && \
+    make install && \
+    cd ../.. && \
+    rm -rf LightGBM 
 
 # ===== Deep learning related Python libraries =====
-# PyTorch
-    $PIP_INSTALL \
-        http://download.pytorch.org/whl/cu90/torch-0.4.0-cp36-cp36m-linux_x86_64.whl \
-        torchvision \
-        && \
 
-# Tensorflow
-    $PIP_INSTALL \
-        tensorflow-gpu \
-        && \
+# Install TensorFlow and Keras
+RUN pip install tensorflow-gpu==${TENSORFLOW_VERSION} keras h5py
 
-# tflearn
-    $PIP_INSTALL \
-	tflearn \
-	&& \
+# Install PyTorch
+RUN PY=$(echo ${PYTHON_VERSION} | sed s/\\.//); \
+    if echo ${PYTHON_VERSION} | grep ^3 >/dev/null; then \
+        pip install http://download.pytorch.org/whl/cu90/torch-${PYTORCH_VERSION}-cp${PY}-cp${PY}m-linux_x86_64.whl; \
+    else \
+        pip install http://download.pytorch.org/whl/cu90/torch-${PYTORCH_VERSION}-cp${PY}-cp${PY}mu-linux_x86_64.whl; \
+    fi; \
+    pip install torchvision
 
-# Keras
-    $PIP_INSTALL \
-        h5py \
-        keras \
-        && \
+# Install tflearn
+RUN pip install tflearn
 
-# OpenCV
-    DEBIAN_FRONTEND=noninteractive $APT_INSTALL \
-        libatlas-base-dev \
-        libgflags-dev \
-        libgoogle-glog-dev \
-        libhdf5-serial-dev \
-        libleveldb-dev \
-        liblmdb-dev \
-        libprotobuf-dev \
-        libsnappy-dev \
-        protobuf-compiler \
-        && \
-
-    $GIT_CLONE --branch 3.4.1 https://github.com/opencv/opencv ~/opencv && \
-    mkdir -p ~/opencv/build && cd ~/opencv/build && \
-    cmake -D CMAKE_BUILD_TYPE=RELEASE \
-          -D CMAKE_INSTALL_PREFIX=/usr/local \
-          -D WITH_IPP=OFF \
-          -D WITH_CUDA=OFF \
-          -D WITH_OPENCL=OFF \
-          -D BUILD_TESTS=OFF \
-          -D BUILD_PERF_TESTS=OFF \
-          .. && \
-    make -j"$(nproc)" install && \
-
-# ===== Configuration and Cleanup =====
+# Install Open MPI
+RUN mkdir /tmp/openmpi && \
+    cd /tmp/openmpi && \
+    wget https://www.open-mpi.org/software/ompi/v3.0/downloads/openmpi-3.0.0.tar.gz && \
+    tar zxf openmpi-3.0.0.tar.gz && \
+    cd openmpi-3.0.0 && \
+    ./configure --enable-orterun-prefix-by-default && \
+    make -j $(nproc) all && \
+    make install && \
     ldconfig && \
-    apt-get clean && \
-    apt-get autoremove && \
-    rm -rf /var/lib/apt/lists/* /tmp/* ~/*
+    rm -rf /tmp/openmpi
+
+# Install Horovod, temporarily using CUDA stubs
+RUN ldconfig /usr/local/cuda-9.0/targets/x86_64-linux/lib/stubs && \
+    HOROVOD_GPU_ALLREDUCE=NCCL HOROVOD_WITH_TENSORFLOW=1 HOROVOD_WITH_PYTORCH=1 pip install --no-cache-dir horovod && \
+    ldconfig
+
+# Create a wrapper for OpenMPI to allow running as root by default
+RUN mv /usr/local/bin/mpirun /usr/local/bin/mpirun.real && \
+    echo '#!/bin/bash' > /usr/local/bin/mpirun && \
+    echo 'mpirun.real --allow-run-as-root "$@"' >> /usr/local/bin/mpirun && \
+    chmod a+x /usr/local/bin/mpirun
+
+# Configure OpenMPI to run good defaults:
+#   --bind-to none --map-by slot --mca btl_tcp_if_exclude lo,docker0
+RUN echo "hwloc_base_binding_policy = none" >> /usr/local/etc/openmpi-mca-params.conf && \
+    echo "rmaps_base_mapping_policy = slot" >> /usr/local/etc/openmpi-mca-params.conf && \
+    echo "btl_tcp_if_exclude = lo,docker0" >> /usr/local/etc/openmpi-mca-params.conf
+
+# Set default NCCL parameters
+RUN echo NCCL_DEBUG=INFO >> /etc/nccl.conf && \
+    echo NCCL_SOCKET_IFNAME=^docker0 >> /etc/nccl.conf
+
+# Install OpenSSH for MPI to communicate between containers
+RUN apt-get install -y --no-install-recommends openssh-client openssh-server && \
+    mkdir -p /var/run/sshd
+
+# Allow OpenSSH to talk to containers without asking for confirmation
+RUN cat /etc/ssh/ssh_config | grep -v StrictHostKeyChecking > /etc/ssh/ssh_config.new && \
+    echo "    StrictHostKeyChecking no" >> /etc/ssh/ssh_config.new && \
+    mv /etc/ssh/ssh_config.new /etc/ssh/ssh_config
+
+# Download examples
+RUN apt-get install -y --no-install-recommends subversion && \
+    svn checkout https://github.com/uber/horovod/trunk/examples && \
+    rm -rf /examples/.svn
 
 # ===== Some tweak to avoid import error when using this container in pycharm =====
 # RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1
