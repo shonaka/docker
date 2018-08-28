@@ -24,6 +24,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         vim \
         wget \
+	gcc \
+	g++ \
         ca-certificates \
         libcudnn7=${CUDNN_VERSION} \
         libnccl2=${NCCL_VERSION} \
@@ -50,14 +52,8 @@ RUN git clone --recursive https://github.com/dmlc/xgboost && \
     cd python-package; python setup.py install
 
 # Install lightgbm
-RUN git clone --recursive --branch stable https://github.com/Microsoft/LightGBM && \
-    mkdir LightGBM/build && \
-    cd LightGBM/build && \
-    cmake .. && \
-    make -j4 && \
-    make install && \
-    cd ../.. && \
-    rm -rf LightGBM 
+RUN git clone --recursive https://github.com/Microsoft/LightGBM && \
+    cd LightGBM/python-package && python setup.py install
 
 # ===== Deep learning related Python libraries =====
 
