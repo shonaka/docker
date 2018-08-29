@@ -1,7 +1,5 @@
 # Sho's custom docker file for research
-
 FROM nvidia/cuda:9.0-devel-ubuntu16.04
-
 MAINTAINER Sho Nakagome <snakagome@uh.edu>
 
 # Partially from https://github.com/uber/horovod/blob/master/Dockerfile
@@ -14,9 +12,7 @@ ENV NCCL_VERSION=2.2.13-1+cuda9.0
 # Setting Python version
 ARG python=3.5
 ENV PYTHON_VERSION=${python}
-
 RUN echo "deb http://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         cmake \
@@ -24,8 +20,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         vim \
         wget \
-	gcc \
-	g++ \
+        gcc \
+        g++ \
         ca-certificates \
         libcudnn7=${CUDNN_VERSION} \
         libnccl2=${NCCL_VERSION} \
@@ -56,7 +52,6 @@ RUN git clone --recursive https://github.com/Microsoft/LightGBM && \
     cd LightGBM/python-package && python setup.py install
 
 # ===== Deep learning related Python libraries =====
-
 # Install TensorFlow and Keras
 RUN pip install tensorflow-gpu==${TENSORFLOW_VERSION} keras h5py
 
@@ -120,10 +115,6 @@ RUN apt-get install -y --no-install-recommends subversion && \
     rm -rf /examples/.svn
 
 # ===== Some tweak to avoid import error when using this container in pycharm =====
-# RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1
-# RUN LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs/:$LD_LIBRARY_PATH python3 setup.py install 
-# RUN rm /usr/local/cuda/lib64/stubs/libcuda.so.1
-
 ENV     CUDNN_INSTALL_PATH=/usr/lib/x86_64-linux-gnu/
 ENV     CUDA_TOOLKIT_PATH=/usr/local/cuda/
 
