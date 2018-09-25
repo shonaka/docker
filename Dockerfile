@@ -12,6 +12,7 @@ ENV NCCL_VERSION=2.2.13-1+cuda9.0
 # Setting Python version
 ARG python=3.5
 ENV PYTHON_VERSION=${python}
+RUN apt-get update && apt-get install -y apt-transport-https
 RUN echo "deb http://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
